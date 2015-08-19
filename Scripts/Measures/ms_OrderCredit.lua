@@ -218,8 +218,12 @@ function Run()
         end
         
         -- If you would like to see german text, replace the english ones. Unfortunatley we can't use labels for multiply language support, because it would make the list very very difficult.
-        -- "Name:         Kreditsumme:       vor48Zins/h:        nach48Zins/h: \n\nFinden k\195\182nnt ihr diese Personen in Eurer Wichtige Personen Liste!\n\n" -- GERMAN -- \195\182 is the lua code for ö
+        
+        -- local BODY = "Name:         Kreditsumme:       vor48Zins/h:        nach48Zins/h: \n\nFinden k\195\182nnt ihr diese Personen in Eurer Wichtige Personen Liste!\n\n" -- GERMAN -- \195\182 is the lua code for ö
+        -- local Taler = "Taler"
         local BODY = "Name:         Sum:       before48Interest/h:        after48Interest/h: \n\nYou can find all your creditors in your Important Persons list!\n\n"  -- standard language is english.
+        local Taler = "Coins"
+        
         local filler = ""
         local filler2 = "    "
         local filler3 = "    "
@@ -237,7 +241,7 @@ function Run()
             while string.len(argumentsarray[i+2]..filler4) < 5+4 do
                 filler4 = "_"..filler4
             end
-            BODY = BODY..argumentsarray[i]..filler2..argumentsarray[i+1].." Coins"..filler3..argumentsarray[i+2].."%"..filler4..argumentsarray[i+3].."% \n" 
+            BODY = BODY..argumentsarray[i]..filler2..argumentsarray[i+1].." "..Taler..filler3..argumentsarray[i+2].."%"..filler4..argumentsarray[i+3].."% \n" 
         end
         local MinEntries = 14 -- how many entries at minimum (filled with -- entries)
         if helpfuncs_mytablelength(argumentsarray)/4 < MinEntries then -- if there too less creditors, the msg window is very small, so we add some empty lines
@@ -245,7 +249,7 @@ function Run()
             filler2 = "______________________    "
             filler3 = "__    "
             for i = 1, MinEntries-helpfuncs_mytablelength(argumentsarray)/4 do
-                BODY = BODY.."--"..filler2.."---- Coins"..filler.."--,--%"..filler3.."--,--% \n"
+                BODY = BODY.."--"..filler2.."---- "..Taler..filler.."--,--%"..filler3.."--,--% \n"
             end
         end
         
