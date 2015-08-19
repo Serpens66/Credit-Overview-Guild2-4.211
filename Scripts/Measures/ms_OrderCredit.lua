@@ -119,7 +119,13 @@ function Run()
 			RentMoney = RentMoney + GBankMoney
 		end
 	end
-	local Comment = "@B[7,@LDebtors: %5n Person and Total Money: %6t]"
+	local Comment = "@B[7,@L_MEASURE_OrderCredit_INFO_+0]"   -- this will lead to a screen with info about creditors
+    local InfoSettingButton = ""
+    if GetProperty("","StopInfo")==0 or not HasProperty("","StopInfo") then
+        InfoSettingButton = "@B[8,@L_MEASURE_OrderCredit_INFO_+1,@L_MEASURE_OrderCredit_INFO_+3]"
+    else
+        InfoSettingButton = "@B[8,@L_MEASURE_OrderCredit_INFO_+2,@L_MEASURE_OrderCredit_INFO_+4]"
+    end
 
 	local layCred = ""
 	layCred = layCred.."@B[1,@L_MEASURE_ORDERCREDIT_STUFF_+0]"
@@ -129,7 +135,7 @@ function Run()
 	kreditR = MsgNews(
 		"",
 		"",
-		"@P"..layCred..xtra.."@B[6,@L_MEASURE_ORDERCREDIT_STUFF_+4]"..Comment,
+		"@P"..layCred..xtra.."@B[6,@L_MEASURE_ORDERCREDIT_STUFF_+4]"..Comment..InfoSettingButton,
 		ms_ordercredit_aidecide,
 		"intrigue",
 		1,
@@ -160,6 +166,101 @@ function Run()
 		StopMeasure()
 	elseif kreditR == 6 then
 	    StopMeasure()
+    elseif kreditR == 7 then  -- screen about creditors
+	    local PanelParam = ""
+        local Alias
+        local bankID
+        local Aliaslist = {}
+        local Aliasnamelist = {}
+        local number = 1
+        local Kreditlist = {}
+        local Zinsmore48list = {}
+        local Zins48list = {}
+        local StartTimeList = {}
+        local GlobalSimCount = ScenarioGetObjects("cl_Sim", -1, "Sims")
+        GetDynasty("","MyDyn")
+        for i = 0, GlobalSimCount-1 do -- check every sim
+            Alias = "Sims"..i
+            if HasProperty(Alias,"SchuldenGeb") then -- if the sim is creditor in any bank
+                bankID = GetProperty(Alias,"SchuldenGeb")  -- the bankID from the creditors bank
+                if GetID("") == bankID then -- only check the actual selected bank 
+                    Aliaslist[number] = Alias
+                    number = number + 1  -- increase this number only, if we entered info
+                end
+            end
+        end
+        
+        local compare = 
+		function(a,b) 
+            return GetProperty(a,"TimeBank")-4 <= GetProperty(b,"TimeBank")-4   -- sort for starting time of the credit
+		end
+        helpfuncs_QuickSort(Aliaslist, 1, helpfuncs_mytablelength(Aliaslist), compare) -- sort it
+        
+        for number = 1, helpfuncs_mytablelength(Aliaslist) do
+            Aliasnamelist[number] = string.sub(GetName(Aliaslist[number]),0, 24)  -- shorten the hole name to a maximum of 24 characters, because otherwise we could get multiple lines
+            Kreditlist[number] = GetProperty(Aliaslist[number],"SchuldenMeng")
+            Zins48list[number] = string.gsub(""..helpfuncs_myround(GetProperty(Aliaslist[number],"Zins48"),2),"%.",",") -- make a string with comma, so it can be shown in overview (don't know how to show floats)
+            Zinsmore48list[number] = string.gsub(""..helpfuncs_myround(GetProperty(Aliaslist[number],"Zinsmore48"),2),"%.",",") -- has to be rounded again... I put 0.07 into Property, and out comes 0.07001231 or simular -.-
+            StartTimeList[number] = GetProperty(Aliaslist[number],"TimeBank")-4  -- is in total game hours, a float number.  right after start it is 6 (game starts at 6am in the round 1400)
+        end
+        
+        local argumentsarray = {}
+        local pos = 1
+        for i = 1, helpfuncs_mytablelength(Aliasnamelist) do  
+            if Aliasnamelist[i]~=nil then
+                --PanelParam = PanelParam.."@B["..i..",@L_MEASURE_OfferCredit_ENTRY_+"..i.."]"  -- für jeden sim einen neuen Button zufügen .. (mehrere Textzeilen geht glaub ich nicht, weil ich nicht weiß, wie mehrere labels innerhalb eines strings)
+                argumentsarray[pos] = Aliasnamelist[i]
+                argumentsarray[pos+1] = Kreditlist[i]
+                argumentsarray[pos+2] = Zins48list[i]
+                argumentsarray[pos+3] = Zinsmore48list[i]
+                pos = pos + 4
+            end
+        end
+        
+        -- If you would like to see german text, replace the english ones. Unfortunatley we can't use labels for multiply language support, because it would make the list very very difficult.
+        -- "Name:         Kreditsumme:       vor48Zins/h:        nach48Zins/h: \n\nFinden k\195\182nnt ihr diese Personen in Eurer Wichtige Personen Liste!\n\n" -- GERMAN -- \195\182 is the lua code for ö
+        local BODY = "Name:         Sum:       before48Interest/h:        after48Interest/h: \n\nYou can find all your creditors in your Important Persons list!\n\n"  -- standard language is english.
+        local filler = ""
+        local filler2 = "    "
+        local filler3 = "    "
+        local filler4 = "    "
+        for i = 1, helpfuncs_mytablelength(argumentsarray), 4 do
+            filler2 = "    "
+            filler3 = "    "
+            filler4 = "    " -- 3 spaces
+            while string.len(argumentsarray[i]..filler2) < 24+4 do
+                filler2 = "_"..filler2
+            end
+            while string.len(argumentsarray[i+1]..filler3) < 4+4 do
+                filler3 = "_"..filler3
+            end
+            while string.len(argumentsarray[i+2]..filler4) < 5+4 do
+                filler4 = "_"..filler4
+            end
+            BODY = BODY..argumentsarray[i]..filler2..argumentsarray[i+1].." Coins"..filler3..argumentsarray[i+2].."%"..filler4..argumentsarray[i+3].."% \n" 
+        end
+        local MinEntries = 14 -- how many entries at minimum (filled with -- entries)
+        if helpfuncs_mytablelength(argumentsarray)/4 < MinEntries then -- if there too less creditors, the msg window is very small, so we add some empty lines
+            filler = "__    "
+            filler2 = "______________________    "
+            filler3 = "__    "
+            for i = 1, MinEntries-helpfuncs_mytablelength(argumentsarray)/4 do
+                BODY = BODY.."--"..filler2.."---- Coins"..filler.."--,--%"..filler3.."--,--% \n"
+            end
+        end
+        
+        MsgBoxNoWait("","", 
+        "@L_MEASURE_ORDERCREDIT_HEAD_+0",
+        BODY, 
+        0 )
+        
+        StopMeasure()
+    elseif kreditR == 8 then
+        if GetProperty("","StopInfo")==0 or not HasProperty("","StopInfo") then
+            SetProperty("","StopInfo",1)
+        else
+            SetProperty("","StopInfo",0)
+        end
 	else
 	    StopMeasure()
 	end
@@ -175,6 +276,7 @@ function Run()
 
 	StopMeasure()
 end
+
 
 function CleanUp()
 	if AliasExists("Actorpointer") then

@@ -905,7 +905,14 @@ function GoToTavern()
 				end
 			end
 		end
-		
+--fix the loop call cas
+		if DistanceBest==-1 then
+			-- not exist Tavern
+			SatisfyNeed("", 8, 0.5)
+			SatisfyNeed("", 1, 0.5)
+			return
+		end
+--fix the loop call case
 		if not f_MoveTo("","Destination") then
 			return
 		end
@@ -1739,6 +1746,9 @@ function TakeACredit()
 					if HasProperty("TmpPointer","OfferCreditNow") then
 						Attractivity = Attractivity + 0.15
 					end
+                    
+                    Attractivity = Attractivity * 1.5 -- by Serp. Increase the weighting of attractivity.
+                    
 					if HasProperty("TmpPointer","KreditKonto") then
 						Distance = Distance / (0.5 + Attractivity)
 						if DistanceBest==-1 or Distance<DistanceBest then
@@ -1866,16 +1876,18 @@ function TakeACredit()
 							else
 								hmuch = (lev*35)+((kreditMeng/100) * ((schuldner*2)+Rand(8)+1))
 								if hmuch < 50 then
-									hmuch = 50
+									hmuch = Rand(31)+40 -- 40 to 70, instead of fix 50  , by serp
 								end
 							end
 
 							local PlaceIs = SimGetWorkingPlaceID("")
 							if lev == 1 and not IsDynastySim("") and PlaceIs == -1 then
-								hmuch = 30
+								hmuch = Rand(41)+10 -- 10 to 40, instead of fix 30  , by serp
 							end
-							if kreditMeng < hmuch then
+							local empty = false
+                            if kreditMeng < hmuch then
 								hmuch = kreditMeng
+                                empty = true
 							end
 							hmuch = math.floor(hmuch)
 
@@ -1883,15 +1895,74 @@ function TakeACredit()
 							SetProperty("","SchuldenGeb",GetID("Destination"))
 							SetProperty("","SchuldenMeng",hmuch)
 							SetProperty("", "TimeBank", GetGametime()+4)
-
+                            
+                            
+                            -- Calculate the expectet interest, if talents, skills and levels from all sims stay the same. The interestrate is lower, when lendingtime is more than 48 hours, to prevent ridiculous high amounts
+                            BuildingGetOwner("Destination","Glaubiger")
+                            local zinsA = GetSkillValue("Glaubiger",BARGAINING)
+                            local zinsB = GetSkillValue("Glaubiger",SECRET_KNOWLEDGE)
+                            local schuldner = SimGetRank("")
+                            local lev = SimGetLevel("")
+                            local knowhow = 1.5*(zinsA + zinsB)
+                            --local lendingtime = GetGametime() - (GetProperty("", "TimeBank")-4) -- lending time in hours (doesnt matter if 1 or 4 years per round, one round is always 24 hours)
+                            if schuldner <= 1 then
+                                knowhow=knowhow+3
+                            elseif schuldner == 2 then
+                                knowhow=knowhow+4
+                            elseif schuldner == 3 then
+                                knowhow=knowhow+6
+                            elseif schuldner == 4 then
+                                knowhow=knowhow+8
+                            else
+                                knowhow=knowhow+10
+                            end
+                            local hecost = (hmuch/100) * (knowhow + (lev/2))
+                            local mecost = 35 + (knowhow) + (lev*2) -- minimum profit
+                            local ecost = math.max(hecost,mecost)
+                            local less48 = 48  -- calculate expected profit with 48hours lendingtime
+                            local more48 = 96  -- calculate expected profit with 96hours lendingtime
+                            local ecost48 = ecost * (less48/24) -- so if ecost is 100, you get after 4 hours 16.6 with an increase of 4.16gold per hour
+                            local ecostmore48 = ecost * (48/24)  
+                            ecostmore48 = ecostmore48 + ecostmore48 * ((more48-48)/96) -- if ledning time is over 48hours, the increase is just 2.083gold per hour
+                            ecost48 = math.floor(ecost48) -- round
+                            ecostmore48 = math.floor(ecostmore48) -- round
+                            local PlaceIs = SimGetWorkingPlaceID("")
+                            if PlaceIs ~= -1 then
+                                ecostmore48 = ecostmore48 + knowhow
+                                ecost48 = ecost48 + knowhow
+                            end
+                            -- now calcualte the interests per hour
+                            local interest48 = ((ecost48/hmuch) / less48) -- interest per hour, if paid back within 48 hours.  has to be rounded, because I know no way to show floats in text.dbt
+                            local interestmore48 = ((ecostmore48/hmuch) / more48) -- interest per hour, if paid back after 48 hours
+                            interest48 =  helpfuncs_myround(interest48*100,2)   -- in % with two places after seperator = float number -- hint: I don't know a way to print float numbers in a text label. so the best way doing this is to replace the number in front of seperator and the seperator itself, with an ",", to make it a string.
+                            interestmore48 = helpfuncs_myround(interestmore48*100,2)
+                            SetProperty("", "Zins48", interest48)
+                            SetProperty("", "Zinsmore48", interestmore48) -- most likely a 0,... float number
+                            -- these values will be shown in the credits overview
+                            
 							SetProperty("Destination","KreditKonto",kreditMeng)
-
 							SatisfyNeed("", 9, 1)
 
 							if BuildingGetOwner("Destination","Glaubiger") then
 								chr_ModifyFavor("","Glaubiger",4)					
 							end
-
+                            
+                            -- send feedback message to owner of bank, by Serp
+                            GetDynasty("Glaubiger","GlaubigerDyn")
+                            if DynastyIsPlayer("GlaubigerDyn") and (GetProperty("Destination","StopInfo")==0 or not HasProperty("Destination","StopInfo")) then -- only for player dynasties and if infosetting is active
+                                feedback_MessageCharacter("Glaubiger",
+                                "@L_MEASURE_OfferCredit_HEAD_+0",
+                                "@L_MEASURE_OfferCredit_BODY_+0",
+                                GetID(""), GetID("Destination") ,hmuch)
+                                if empty then
+                                    -- send feedback message to owner of bank if kreditkonto is empty, by Serp
+                                    feedback_MessageCharacter("Glaubiger",
+                                    "@L_MEASURE_OfferCredit_HEAD_+2",
+                                    "@L_MEASURE_OfferCredit_BODY_+2",
+                                    GetID("Destination"))
+                                end
+                            end
+                            
 							Sleep(dowhat)
 							f_EndUseLocator("","SitPos",GL_STANCE_STAND)
 						end
@@ -1950,6 +2021,7 @@ function ReturnACredit()
 			local schuldner = SimGetRank("")
 			local lev = SimGetLevel("")
 			local knowhow = 1.5*(zinsA + zinsB)
+            local lendingtime = GetGametime() - (GetProperty("", "TimeBank")-4) -- lending time in hours (doesnt matter if 1 or 4 years per round, one round is always 24 hours)
 
 			if schuldner <= 1 then
 				knowhow=knowhow+3
@@ -1964,23 +2036,40 @@ function ReturnACredit()
 			end
 
 			local hecost = (schuld/100) * (knowhow + (lev/2))
-			local mecost = 45+(knowhow)+(lev*2)
+			local mecost = 35 + (knowhow) + (lev*2) -- minimum profit
 			local ecost = math.max(hecost,mecost)
-			ecost = math.floor(ecost)
+            if lendingtime <= 48 then -- if less than 2 rounds
+                ecost = ecost * (lendingtime/24) -- so if ecost is 100, you get after 4 hours 16.6 with an increase of 4.16gold per hour
+                -- the min lending time seems to be 4 hours. After that time it seems to be random, when the credit is paid back.
+            elseif lendingtime > 48 then
+                ecost = ecost * (48/24)  
+                ecost = ecost + ecost * ((lendingtime-48)/96) -- if ledning time is over 48hours, the increase is just 2.083gold per hour, to prevent ridiculous high amounts
+            end
+			ecost = math.floor(ecost) -- round
+
 
 			local PlaceIs = SimGetWorkingPlaceID("")
 			if PlaceIs ~= -1 then
 				ecost = ecost + knowhow
 			end
-			
+			local bankkonto
 			if not HasProperty("Destination","KreditKonto") then
 				bankkonto = schuld + ecost
 				CreditMoney("Destination",bankkonto,"tip")
 			else
-				local bankkonto = GetProperty("Destination","KreditKonto") + schuld
+                bankkonto = GetProperty("Destination","KreditKonto") + schuld
 				SetProperty("Destination","KreditKonto",bankkonto)
 				CreditMoney("Destination",ecost,"tip")
 			end
+            
+            -- send feedback message to owner of bank, by Serp
+            GetDynasty("Glaubiger","GlaubigerDyn")
+            if DynastyIsPlayer("GlaubigerDyn") and (GetProperty("Destination","StopInfo")==0 or not HasProperty("Destination","StopInfo")) then -- only for player dynasties and if infosetting is active
+                feedback_MessageCharacter("Glaubiger",
+                "@L_MEASURE_OfferCredit_HEAD_+1",
+                "@L_MEASURE_OfferCredit_BODY_+1",
+                GetID(""), GetID("Destination") ,schuld,schuld + ecost,math.floor(lendingtime))
+            end
 
 			if HasProperty("","SchuldenMeng") then
 				RemoveProperty("","SchuldenMeng")

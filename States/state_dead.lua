@@ -87,7 +87,35 @@ function Run()
 
 		---------------------
 		------ Lay out ------
-		---------------------
+		---------------------  
+        if HasProperty("", "SchuldenGeb") then
+            bankID = GetProperty("","SchuldenGeb")
+            
+            local BuildingsCount = ScenarioGetObjects("cl_Building", -1, "Building")
+            local Bank = ""
+            local once = true
+            for i = 0, BuildingsCount-1 do
+                if once then
+                    if bankID == GetID("Building"..i) then
+                        Bank = "Building"..i
+                        once = false
+                    end
+                else
+                    break
+                end
+            end
+            if Bank ~= "" then 
+                BuildingGetOwner(Bank,"Glaubiger")
+                GetDynasty("Glaubiger","GlaubigerDyn")
+                if DynastyIsPlayer("GlaubigerDyn") and (GetProperty(Bank,"StopInfo")==0 or not HasProperty(Bank,"StopInfo")) then -- send feedback message, that owner won't get his money back 
+                    feedback_MessageCharacter("Glaubiger",
+                    "@L_MEASURE_OfferCredit_HEAD_+4",
+                    "@L_MEASURE_OfferCredit_BODY_+3",
+                    GetID(""),GetProperty("","SchuldenMeng"))
+                end
+            end
+		end
+        
 		if HasProperty("", "WasDynastySim") then
 
 			-- Indicates if a sim of the local player dynasty is dead
@@ -184,12 +212,9 @@ function Run()
 				MaxTries = MaxTries - 1
 			end
 		else
-
 			GfxMoveToPosition("", 0, -50, 0, 6, false)
 			return
-
 		end
-
 	---------------------------
 	------ Building die -------
 	---------------------------
