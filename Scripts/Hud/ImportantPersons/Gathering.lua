@@ -49,7 +49,135 @@ function ImportantPersonsSetupSections()
 	CreateImportantPersonSection("Neutral", "@L_IMPORTANTPERSONS_TOPICS_+10")
 	CreateImportantPersonSection("Enemies", "@L_IMPORTANTPERSONS_TOPICS_+4")
 	
+    -- people who lended money in your bankhouse
+   CreateImportantPersonSection("CreditorSearch", "@L_Creditors")
+end
 
+
+-- CREDITORS  , by Serp
+function IsCreditorSim(Alias)
+
+    local IsCreditor = false  
+    local bankID
+    if HasProperty(Alias,"SchuldenGeb") then -- if the sim is creditor in any bank
+        bankID = GetProperty(Alias,"SchuldenGeb")  -- the bankID from the creditors bank
+        GetDynasty("","MyDyn")
+        for i = 0, DynastyGetBuildingCount2("MyDyn")-1 do  -- loop through all your buildings
+            DynastyGetBuilding2("MyDyn",i,"Bank") -- save the building in "Bank"
+            if BuildingGetType("Bank")==43 then -- check if it is really a bankhouse
+                if GetID("Bank") == bankID then  -- check if your bank is the creditors bank
+                    IsCreditor = true
+                end
+            end
+        end
+    end
+    return IsCreditor
+end
+
+-- Called by game to populate the "Creditors" section... at the moment sorted by level and age 
+function ImportantPersonsGather_CreditorSearch()
+	-- Set Debug = true to show messages in game e.g number of people which matched etc.
+    local Debug = false
+	if Debug then MsgQuick("", "ImportantPersonsGather_CreditorSearch()") end
+	
+	-- Define the criteria sims must meet to be included.
+	local SimListFilterFunction = gathering_IsCreditorSim
+	
+	-- Define the sims list sort order.
+	local SimListSortCompareFunction = 
+		function(a,b) 
+            return GetProperty(a,"TimeBank")-4 <= GetProperty(b,"TimeBank")-4   -- sort for starting time of the credit
+		end
+	
+	-- Find, sort and add the sims.
+	gathering_PopulateImportantPersonSection("CreditorSearch", SimListFilterFunction, SimListSortCompareFunction, Debug)
+end
+
+-- By Nommy: http://forum.runeforge-games.net/index.php/topic,840.0.html
+-- gathering_PopulateImportantPersonSection()
+-- Finds, sorts and adds sims to the specified section using the provided filter and sort critera.
+-- Arguments:
+--     Label                        Section label. Should be same as first argument passed to CreateImportantPersonSection() in ImportantPersonsSetupSections().
+--     SimListFilterFunction        Function defining the critera sims are required to match to be included in the list.
+--                                     The function should take 1 argument (the sim alias string) and return true when the sim is to be included or false otherwise.
+--                                     e.g:    function(Alias) return SimGetProfession(Alias) == 10 end
+--     SimListSortCompareFunction   (optional) comparison function used to sort the elements. See compare argument of QuickSort() function below for more details.
+--     Debug                        (optional) Whether to display debug messages in the game (sim counts etc). Default = false (no).
+--
+function PopulateImportantPersonSection(Label, SimListFilterFunction, SimListSortCompareFunction, Debug)	
+	-- Assign missing arguments default values
+	SimListSortCompareFunction = SimListSortCompareFunction or function(a,b) return SimGetAge(a)<=SimGetAge(b) end
+	Debug = Debug or false
+	-- Assign control values
+	local MaxSearchResults = -1  -- Number of sims returned by search is unlimited.
+	
+	-- Get a list of all sims in the world. (I couldn't get Find() to work, so resorted to this.)
+	local GlobalSimCount = ScenarioGetObjects("cl_Sim", MaxSearchResults, "Sims")
+	if Debug then MsgQuick("", "PopulateImportantPersonSection(\""..Label.."\", ...)   GlobalSimCount="..GlobalSimCount) end
+	if GlobalSimCount == 0 then
+		return
+	end
+	
+	-- Filter the list to only include sims which match the supplied filter function.
+	local FilteredSims = {}
+	local FilteredSimCount = 0
+	local Alias
+	for i = 0, GlobalSimCount-1 do
+		Alias = "Sims"..i
+		if SimListFilterFunction(Alias) then
+			FilteredSimCount = FilteredSimCount + 1
+			FilteredSims[FilteredSimCount] = Alias
+		end
+	end
+	if Debug then MsgQuick("", "FilteredSimCount="..FilteredSimCount) end
+	
+	-- Sort the list of sims (by age by default).
+	-- Note: table.sort() and other table functions don't seem to work so the quicksort function defined below is used instead.
+	gathering_QuickSort(FilteredSims, 1, FilteredSimCount, SimListSortCompareFunction)
+	
+	-- Add the sorted list of sims to the specified section.
+	local Classes = ""
+	for i = 1, FilteredSimCount do
+		Alias = FilteredSims[i]
+		SetImportantPersonToSection(GetID(Alias), Label, GetDynastyID(""))
+		Classes = Classes.." "..SimGetClass(Alias)
+	end
+	if Debug then MsgQuick("", "Classes="..Classes) end
+end
+
+-- gathering_QuickSort()
+-- Sorts a table opionally using specified comparison function.
+-- http://rosettacode.org/wiki/Sorting_algorithms/Quicksort#Lua
+-- Arguments:
+--    t        table to be sorted
+--    start    first element index
+--    endi     last element index
+--    compare  (optional) comparison function used to sort the elements. The function should take 2 arguments and
+--             should return true when the first is less than or equal to the second and false otherwise. The default is:
+--             function(a,b) return a<=b end
+-- 
+function QuickSort(t, start, endi, compare)
+  start = start or 1
+  compare = compare or function(a,b) return a<=b end
+  -- partition w.r.t. first element
+  if(endi - start < 2) then return t end
+  local pivot = start
+  for i = start + 1, endi do
+    -- equivalent of:   if t[i] <= t[pivot] then
+    if compare(t[i], t[pivot]) then
+      local temp = t[pivot + 1]
+      t[pivot + 1] = t[pivot]
+      if(i == pivot + 1) then
+        t[pivot] = temp
+      else
+        t[pivot] = t[i]
+        t[i] = temp
+      end
+      pivot = pivot + 1
+    end
+  end
+  t = gathering_QuickSort(t, start, pivot - 1, compare)
+  return gathering_QuickSort(t, pivot + 1, endi, compare)
 end
 
 
