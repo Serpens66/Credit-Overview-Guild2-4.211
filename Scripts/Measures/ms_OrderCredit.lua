@@ -219,10 +219,10 @@ function Run()
         
         -- If you would like to see german text, replace the english ones. Unfortunatley we can't use labels for multiply language support, because it would make the list very very difficult.
         
-        -- local BODY = "Name:         Kreditsumme:       vor48Zins/h:        nach48Zins/h: \n\nFinden k\195\182nnt ihr diese Personen in Eurer Wichtige Personen Liste!\n\n" -- GERMAN -- \195\182 is the lua code for ö
-        -- local Taler = "Taler"
-        local BODY = "Name:         Sum:       before48Interest/h:        after48Interest/h: \n\nYou can find all your creditors in your Important Persons list!\n\n"  -- standard language is english.
-        local Taler = "Coins"
+        local BODY = "Name:         Kreditsumme:       vor48Zins/h:        nach48Zins/h: \n\nFinden k\195\182nnt ihr diese Personen in Eurer Wichtige Personen Liste!\n\n" -- GERMAN -- \195\182 is the lua code for ö
+        local Taler = "Taler"
+        -- local BODY = "Name:         Sum:       before48Interest/h:        after48Interest/h: \n\nYou can find all your creditors in your Important Persons list!\n\n"  -- standard language is english.
+        -- local Taler = "Coins"
         
         local filler = ""
         local filler2 = "    "

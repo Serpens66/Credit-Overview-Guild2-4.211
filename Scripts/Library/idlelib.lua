@@ -1752,14 +1752,43 @@ function TakeACredit()
 					if HasProperty("TmpPointer","KreditKonto") then
 						Distance = Distance / (0.5 + Attractivity)
 						if DistanceBest==-1 or Distance<DistanceBest then
-							CopyAlias("Bank"..i,"Destination")
+							--CopyAlias("Bank"..i,"Destination")
 							DistanceBest = Distance
 						end
 					end
 					RemoveAlias("TmpPointer")
 				end
+                
+                -- a more randomized selection of destination. If distance for two destinations is 500 and 1000 , it is a ~ 2/3 chance to go to the first, and a 1/3 chance, to go to the second. by serp
+                SetProperty("Bank"..i,"DistanceValue",Distance) -- save Distance+Attractivity value in property
+                if Distance ~= -1 then
+                    AllDistance = AllDistance + Distance  -- sum up the total distance from all destinations
+                end
 			end
+            local AllChance = 0
+            for i=0,NumBankhouses-1 do
+                if GetProperty("Bank"..i,"DistanceValue") ~= -1 then
+                    AllChance = AllChance + (AllDistance / GetProperty("Bank"..i,"DistanceValue")) -- sum up all ^-1 values of the chances (^-1 because the lower the distance, the higher the chance to be picked)
+                end
+            end
+            GetLocalPlayerDynasty("localdyn")
+            local randnumber = Rand(100)+1
+            local chance
+            local sum = 0
+            for i=0,NumBankhouses-1 do
+                if GetProperty("Bank"..i,"DistanceValue") ~= -1 then
+                    chance = ((AllDistance / GetProperty("Bank"..i,"DistanceValue")) / AllChance) * 100 -- calculate the new real chance for a destination to be chosen
+                    if randnumber > sum and randnumber <= chance + sum then  -- only for one destination this can be true
+                        CopyAlias("Bank"..i,"Destination")
+                        --MsgQuick("localdyn",i.." chance: "..chance.." and randnumber: "..randnumber)  -- for testing
+                    end
+                    sum = sum + chance
+                end
+                RemoveProperty("Bank"..i,"DistanceValue")
+            end
 		end
+        
+        
 		if (DistanceBest==-1) or (AliasExists("Destination")==false) or (BuildingGetType("Destination")~=43) then
 			-- bank not exist
 			SatisfyNeed("", 9, 1)
