@@ -1733,6 +1733,9 @@ function TakeACredit()
 					IgnoreID = GetProperty("", "IgnoreBank")
 				end
 			end
+            ---
+            local AllDistance = 0  
+            ---
 			for i=0,NumBankhouses-1 do
 				if IgnoreID and IgnoreID == GetID("Bank"..i) then
 					Distance = -1
@@ -1752,7 +1755,7 @@ function TakeACredit()
 					if HasProperty("TmpPointer","KreditKonto") then
 						Distance = Distance / (0.5 + Attractivity)
 						if DistanceBest==-1 or Distance<DistanceBest then
-							--CopyAlias("Bank"..i,"Destination")
+							--CopyAlias("Bank"..i,"Destination")  
 							DistanceBest = Distance
 						end
 					end
